@@ -10,7 +10,6 @@ git_commit_push.sh
 gitconfig.sh 
 .vscode/
 
-**/multimodal-data/
 vis_Dataset/
 visualizations/
 
