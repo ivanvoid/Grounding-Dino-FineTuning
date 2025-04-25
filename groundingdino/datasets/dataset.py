@@ -30,10 +30,10 @@ class GroundingDINODataset(Dataset):
             for row in ann_reader:
                 img_path = os.path.join(img_dir, row['image_name'])
                 # Store in [x,y,w,h] format directly
-                x = int(row['bbox_x'])
-                y = int(row['bbox_y'])
-                w = int(row['bbox_width'])
-                h = int(row['bbox_height'])
+                x = int(round(float(row['bbox_x'])))
+                y = int(round(float(row['bbox_y'])))
+                w = int(round(float(row['bbox_width'])))
+                h = int(round(float(row['bbox_height'])))
                 
                 # Convert to center format [cx,cy,w,h]
                 cx = x + w/2
