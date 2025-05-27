@@ -106,7 +106,7 @@ class GroundingDINOTrainer:
         # Initialize scheduler with warmup
         if lr_scheduler=="onecycle":
             total_steps = num_steps_per_epoch * num_epochs
-            #warmup_steps = num_steps_per_epoch * warmup_epochs  
+	    #warmup_steps = num_steps_per_epoch * warmup_epochs
             #self.scheduler = get_cosine_schedule_with_warmup(
             #    self.optimizer,
             #    num_warmup_steps=warmup_steps,
