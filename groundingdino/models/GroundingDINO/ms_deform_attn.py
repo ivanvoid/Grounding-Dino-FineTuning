@@ -327,7 +327,10 @@ class MultiScaleDeformableAttention(nn.Module):
                 )
             )
     
-        if torch.cuda.is_available() and value.is_cuda:
+        # FIX based on:
+        # https://github.com/IDEA-Research/GroundingDINO/issues/8#issuecomment-1541892708
+        # if torch.cuda.is_available() and value.is_cuda:
+        if not torch.cuda.is_available():
             halffloat = False
             if value.dtype == torch.float16:
                 halffloat = True

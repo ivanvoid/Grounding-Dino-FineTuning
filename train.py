@@ -29,7 +29,7 @@ def setup_model(model_config: ModelConfig, use_lora: bool=False) -> torch.nn.Mod
         model_config.config_path,
         model_config.weights_path,
         use_lora=use_lora,
-    )
+    ).to('cuda:0')
 
 def setup_data_loaders(config: DataConfig) -> tuple[DataLoader, DataLoader]:
 
