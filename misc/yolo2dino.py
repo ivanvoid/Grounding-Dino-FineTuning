@@ -40,66 +40,65 @@ with open(meta_filepath) as f:
 class_map = yamldata['names']
 print(f'{class_map}\n')
 
+all_filenames = sorted(os.listdir(labels_path))
+random.shuffle(all_filenames)
+train_split = int(len(all_filenames) * train_test_split)
 
-data = []
+def data_from_filenames(filenames):
+    data = []
+    for name in filenames:
+        filepath = os.path.join(labels_path, name)
 
+        imgname = '.'.join(name.split('.')[:-1]) + '.jpg'
+        imgpath = os.path.join(images_path, imgname)
+        assert os.path.isfile(imgpath), f'File not found:\n{imgpath}'
+        #print(f'imgpath: {imgpath}')
+        width, height = Image.open(imgpath).size
 
-filenames = sorted(os.listdir(labels_path))
-for name in filenames:
-    filepath = os.path.join(labels_path, name)
+        with open(filepath, 'r') as f:
+            for line in f:
+                # Split each line based on spaces
+                parts = line.strip().split()
+                assert len(parts)==5, "Each line should have 5 values"
+                #print(parts)
+                
+                class_id = int(parts[0])
+                assert class_id < len(class_map), 'Class ID out of bounds'
+                class_name = class_map[class_id]
 
-    imgname = '.'.join(name.split('.')[:-1]) + '.jpg'
-    imgpath = os.path.join(images_path, imgname)
-    assert os.path.isfile(imgpath), f'File not found:\n{imgpath}'
-    #print(f'imgpath: {imgpath}')
-    width, height = Image.open(imgpath).size
+                x_center = int(float(parts[1]) * width)
+                y_center = int(float(parts[2]) * height)
+                bbox_w   = int(float(parts[3]) * width)
+                bbox_h   = int(float(parts[4]) * height)
+                
+                x_top_left = int(x_center - (bbox_w / 2))
+                y_top_left = int(y_center - (bbox_h / 2))
 
-    with open(filepath, 'r') as f:
-        for line in f:
-            # Split each line based on spaces
-            parts = line.strip().split()
-            assert len(parts)==5, "Each line should have 5 values"
-            #print(parts)
-            
-            class_id = int(parts[0])
-            assert class_id < len(class_map), 'Class ID out of bounds'
-            class_name = class_map[class_id]
-
-            x_center = int(float(parts[1]) * width)
-            y_center = int(float(parts[2]) * height)
-            bbox_w   = int(float(parts[3]) * width)
-            bbox_h   = int(float(parts[4]) * height)
-            
-            x_top_left = int(x_center - (bbox_w / 2))
-            y_top_left = int(y_center - (bbox_h / 2))
-
-            row = [class_name, x_top_left, y_top_left, bbox_w, bbox_h, imgname, width, height]
-            data.append(row)
+                row = [class_name, x_top_left, y_top_left, bbox_w, bbox_h, imgname, width, height]
+                data.append(row)
+    return data
 
 
 ###
 # Write DINO dataset
 columns = ['label_name', 'bbox_x', 'bbox_y', 'bbox_width', 'bbox_height', 'image_name', 'width', 'height']
 
-random.shuffle(data)
-train_split = int(len(data) * train_test_split)
-
-#import pdb;pdb.set_trace()
-
 def cp_imgs(path, data):
     for row in data:
         _src = os.path.join(images_path, row[5])
         _dst = os.path.join(path, row[5])
-        shutil.copy(_src, _dst)
+        if not os.path.isfile(_dst):
+            shutil.copy(_src, _dst)
 
 for task in ['train', 'val']:
     output_csv = os.path.join(dst, f'{task}_annotations.csv')
-    
+    #import pdb;pdb.set_trace()
+    # sorted([d[5] for d in _data])
     if task == 'train':
-        _data = data[:train_split]
+        _data = data_from_filenames(all_filenames[train_split:])#data[:train_split]
         cp_imgs(dst_im_train, _data)
     if task == 'val':
-        _data = data[train_split:]
+        _data = data_from_filenames(all_filenames[:train_split])#data[train_split:]
         cp_imgs(dst_im_val, _data)
 
     df = pd.DataFrame(_data, columns=columns)

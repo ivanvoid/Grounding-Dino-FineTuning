@@ -1,8 +1,8 @@
 data:
-  train_ann: multimodal-data/fashion_dataset_subset/train_annotations.csv
-  train_dir: multimodal-data/fashion_dataset_subset/images/train
-  val_ann: multimodal-data/fashion_dataset_subset/val_annotations.csv
-  val_dir: multimodal-data/fashion_dataset_subset/images/val
+  train_ann: multimodal-data/DINO_GAI20II/train_annotations.csv
+  train_dir: multimodal-data/DINO_GAI20II/images/train
+  val_ann: multimodal-data/DINO_GAI20II/val_annotations.csv
+  val_dir: multimodal-data/DINO_GAI20II/images/val
   batch_size: 4
   num_workers: 8
 
@@ -17,4 +17,4 @@ training:
   save_frequency: 5
   warmup_epochs: 5
   use_lora: true
-  visualization_frequency: 5
+  visualization_frequency: 2

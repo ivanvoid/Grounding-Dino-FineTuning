@@ -336,4 +336,5 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
 
             
 if __name__ == "__main__":
-    train('configs/train_config.yaml')
+    #train('configs/train_config.yaml')
+    train('configs/custum_train_config.yaml')
