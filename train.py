@@ -1,24 +1,24 @@
 import os
-from collections import defaultdict
+import yaml
 import torch
+from datetime import datetime
+from collections import defaultdict
+from typing import Dict, NamedTuple, Optional, Any
+from peft import get_peft_model_state_dict
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import OneCycleLR
+
+from ema_pytorch import EMA
 from groundingdino.util.train import load_model
 from groundingdino.util.misc import nested_tensor_from_tensor_list
-from ema_pytorch import EMA
-from typing import Dict, NamedTuple
 from groundingdino.util.model_utils import freeze_model_layers,print_frozen_status
-from torch.optim.lr_scheduler import OneCycleLR
 from groundingdino.util.matchers import build_matcher
 from groundingdino.util.inference import GroundingDINOVisualizer
 from groundingdino.util.model_utils import freeze_model_layers, print_frozen_status
 from groundingdino.util.lora import get_lora_optimizer_params, verify_only_lora_trainable
-from datetime import datetime
-import yaml
-from typing import Dict, Optional, Any
 from groundingdino.datasets.dataset import GroundingDINODataset
 from groundingdino.util.losses import SetCriterion
 from config import ConfigurationManager, DataConfig, ModelConfig
-from peft import get_peft_model_state_dict
 
 # Ignore tokenizer warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -214,8 +214,9 @@ class GroundingDINOTrainer:
             for k, v in loss_dict.items():
                 val_losses[k] += v.item()
                 
-            val_losses['total_loss'] += sum(loss_dict[k] * self.weights_dict[k] 
-                                        for k in loss_dict.keys() if k in self.weights_dict_loss).item()
+            val_losses['total_loss'] += sum(
+                loss_dict[k] * self.weights_dict[k] 
+                for k in loss_dict.keys() if k in self.weights_dict_loss).item()
             num_batches += 1
 
         # Average losses
@@ -336,5 +337,5 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
 
             
 if __name__ == "__main__":
-    #train('configs/train_config.yaml')
-    train('configs/custum_train_config.yaml')
+    train('configs/train_config.yaml')
+    # train('configs/custum_train_config.yaml')

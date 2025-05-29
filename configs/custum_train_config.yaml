@@ -17,4 +17,5 @@ training:
   save_frequency: 5
   warmup_epochs: 5
   use_lora: true
+  lora_rank: :32
   visualization_frequency: 2

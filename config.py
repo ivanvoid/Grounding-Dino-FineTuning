@@ -45,6 +45,7 @@ class TrainingConfig:
     save_frequency: int = 100
     warmup_epochs: int = 5
     use_lora: bool = False
+    lora_rank: int = 32
     visualization_frequency: int = 5
 
     @classmethod
@@ -56,6 +57,7 @@ class TrainingConfig:
             save_frequency=int(data.get('save_frequency', 100)),
             warmup_epochs=int(data.get('warmup_epochs', 5)),
             use_lora=bool(data.get('use_lora', False)),
+            lora_rank=int(data.get('lora_rank', 32)),
             visualization_frequency=int(data.get('visualization_frequency', 5))
         )
 

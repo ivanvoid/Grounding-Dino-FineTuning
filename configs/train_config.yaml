@@ -14,7 +14,7 @@ training:
   num_epochs: 20
   learning_rate: 1e-3
   save_dir: "weights"
-  save_frequency: 5
+  save_frequency: 1
   warmup_epochs: 5
   use_lora: true
   visualization_frequency: 5

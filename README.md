@@ -61,6 +61,12 @@ Visualize results of training on test images. **See `configs/test_config.yaml` f
 python test.py
 ```
 
+## Quantitative Results
+|Model|Accuracy|Precision|Recall|F1|IoU|
+|-|-|-|-|-|-|
+|G-DINO base|0.7912|1.0 ± 0.0|0.7823 ± 0.2505|0.8531 ± 0.1815|0.6937 ± 0.3781|
+|G-DINO LORA 15 epochs|0.9017|1.0 ± 0.0|0.9000 ± 0.1813|0.9360 ± 0.1225|0.7653 ± 0.3112|
+
 
 ## Qualitative Results
 
