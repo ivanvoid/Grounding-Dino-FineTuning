@@ -45,6 +45,12 @@ pip install -e .
 
 Dataset is a subset of fashion dataset availbale in hugging face with categories bag, shirt and pant e.t.c. A random subset of 200 images are selected for training containing three categoreis, also random 50 images containing these three categories are choosen for test images, you can get the sample dataset from here [GoogleDrive](https://drive.google.com/file/d/1D2qphEE98Dloo3fUURRnsxaIRw076ZXX/view?usp=drive_link) and put it inside multimodal-data to use data as it is.
 
+## YOLOv7 dataset to DINO format 
+```shell
+cd misc
+python 
+```
+
 ## Train: 
 
 1. Prepare your dataset with images and associated textual captions. A tiny dataset is given multimodal-data to demonstrate the expected data format.

@@ -95,10 +95,10 @@ for task in ['train', 'val']:
     #import pdb;pdb.set_trace()
     # sorted([d[5] for d in _data])
     if task == 'train':
-        _data = data_from_filenames(all_filenames[train_split:])#data[:train_split]
+        _data = data_from_filenames(all_filenames[:train_split])
         cp_imgs(dst_im_train, _data)
     if task == 'val':
-        _data = data_from_filenames(all_filenames[:train_split])#data[train_split:]
+        _data = data_from_filenames(all_filenames[train_split:])
         cp_imgs(dst_im_val, _data)
 
     df = pd.DataFrame(_data, columns=columns)

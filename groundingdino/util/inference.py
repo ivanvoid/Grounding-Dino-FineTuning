@@ -224,7 +224,7 @@ class GroundingDINOVisualizer:
         save_dir = os.path.join(self.save_dir, f'inference')
         os.makedirs(save_dir, exist_ok=True)
 
-        with torch.no_grad():          
+        with torch.no_grad():
             caption = preprocess_caption(caption=caption)
             model = model.to(device)
             image = image.to(device)
@@ -266,7 +266,86 @@ class GroundingDINOVisualizer:
             else:
                 print(f"No boxes found for the image above given thresholds!")
 
+    # def predict_image2(self, model, image, caption,image_source,fname,device="cuda", box_th=0.3,txt_th=0.2):
 
+    #     from transformers import AutoProcessor
+    #     import pdb;pdb.set_trace()
+    #     model_id = "IDEA-Research/grounding-dino-tiny"
+    #     processor = AutoProcessor.from_pretrained(model_id)
+
+    #     text_labels = [caption.split(' . ')]
+
+    #     inputs = processor(images=image_source, text=text_labels, return_tensors="pt").to(device)
+    #     outputs = model(inputs['pixel_values'], inputs['input_ids'])
+
+    #     caption = preprocess_caption(caption=caption)
+    #     model = model.to(device)
+    #     image = image.to(device)
+    #     outputs = model(image[None], captions=[caption])
+
+    #     results = processor.post_process_grounded_object_detection(
+    #     outputs,
+    #     inputs.input_ids,
+    #     box_threshold=0.4,
+    #     text_threshold=0.3,
+    #     target_sizes=[image.size[::-1]]
+    #     )
+
+    #     pass
+
+    #     return 0
+
+    def predict_image(self, model, image, caption,image_source,fname,device="cuda", box_th=0.3,txt_th=0.2):
+        model.eval()
+        save_dir = os.path.join(self.save_dir, f'inference')
+        os.makedirs(save_dir, exist_ok=True)
+
+        # from transformers import AutoProcessor
+
+        with torch.no_grad():
+            caption = preprocess_caption(caption=caption)
+            model = model.to(device)
+            image = image.to(device)
+            outputs = model(image[None], captions=[caption])
+
+            ## Original source image
+            img = image_source
+            h, w, _ = image_source.shape
+            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+            # Get predictions & filter by confidence
+            pred_logits = outputs["pred_logits"][0].cpu().sigmoid()
+            pred_boxes = outputs["pred_boxes"][0].cpu()
+
+            # Filter confident predictions
+            scores = pred_logits.max(dim=1)[0]
+            ## The least threshold which is required for object to be useful
+            mask = scores > box_th
+
+            filtered_boxes = pred_boxes[mask]
+            filtered_logits = pred_logits[mask]
+
+
+            # Get phrase predictions
+            tokenized = outputs['tokenized']
+            phrases = self.extract_phrases(filtered_logits, tokenized, model.tokenizer,text_threshold=txt_th)
+
+            # Draw predictions
+            if len(filtered_boxes):
+                boxes = filtered_boxes * torch.tensor([w, h, w, h])
+                xyxy = box_cxcywh_to_xyxy(boxes).numpy()
+                
+                detections = sv.Detections(xyxy=xyxy)
+                img_bgr = self.pred_annotator.annotate(
+                    scene=img_bgr,
+                    detections=detections,
+                    labels=phrases
+                )
+                cv2.imwrite(f"{save_dir}/{fname}.jpg", img_bgr)
+                return {'boxes':boxes, 'phrases':phrases}
+            else:
+                print(f"No boxes found for the image above given thresholds!")
+                return None
 
 def predict(
         model,
