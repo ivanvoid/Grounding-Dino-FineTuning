@@ -15,7 +15,7 @@ class SetCriterion(nn.Module):
         self.matcher = matcher
         self.eos_coef = eos_coef  # Will use this to weight no-object loss
         self.losses = losses
-        self.matcher = matcher
+        # self.matcher = matcher
         if loss_type == 'bce':
             self.cls_loss = BCEWithLogitsLoss(eos_coef=eos_coef)
         elif loss_type == 'multilabelfocal':
@@ -170,6 +170,10 @@ class SetCriterion(nn.Module):
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, **kwargs)
 
+    def get_accuracy(self, outputs, targets):
+        indices, cls_labels = self.matcher(outputs, targets)
+        processed = self.preprocess_targets(outputs, cls_labels, indices)
+        return self._compute_accuracy(processed)
     
     def forward(self, outputs, targets, **kwargs):
         """ This performs the loss computation.

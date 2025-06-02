@@ -158,7 +158,7 @@ class GroundingDINOTrainer:
         if isinstance(images, (list, tuple)):
             images = nested_tensor_from_tensor_list(images)  # Convert list to NestedTensor
         images = images.to(self.device)
-
+        
         captions=[]
         for target in targets:
             target['boxes']=target['boxes'].to(self.device)

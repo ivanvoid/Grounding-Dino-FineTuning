@@ -3,8 +3,8 @@ data:
   num_workers: 8
   train_ann: multimodal-data/DINO_GAI20II/train_annotations.csv
   train_dir: multimodal-data/DINO_GAI20II/images/train
-  val_ann: multimodal-data/DINO_GAI20II/val_annotations.csv
-  val_dir: multimodal-data/DINO_GAI20II/images/val
+  val_ann: multimodal-data/DINO_GAI20II/all_annotations.csv
+  val_dir: multimodal-data/DINO_GAI20II/images/all
 model:
   config_path: groundingdino/config/GroundingDINO_SwinT_OGC.py
   lora_weights: weights/20250527_1516/checkpoint_epoch_10.pth
@@ -14,6 +14,6 @@ training:
   num_epochs: 200
   save_dir: weights
   save_frequency: 5
-  use_lora: true
+  use_lora: false
   visualization_frequency: 5
   warmup_epochs: 5

@@ -176,6 +176,8 @@ def print_statistics(all_metrics):
 
     print('*'*32)
 
+from groundingdino.util.losses import SetCriterion
+from groundingdino.util.matchers import build_matcher
 def process_images(
         model,
         text_prompt,
@@ -183,6 +185,69 @@ def process_images(
         box_threshold=0.35,
         text_threshold=0.25
 ):
+    # New Validation
+    # SetCriterion(max_txt_len, self.matcher, eos_coef, losses)
+    # outputs, targets, captions=captions, tokenizer=self.model.tokenizer
+    max_txt_len = 256
+    matcher = build_matcher(2.0, 5.0, 1.0, 'Hungarian')
+    eos_coef = 0.1
+    losses = ['labels', 'boxes']
+    criterion = SetCriterion(max_txt_len, matcher, eos_coef, losses)
+    criterion.to('cuda')
+
+
+    # Get bbox and imgname
+    df = pd.read_csv(data_config.val_ann)
+    label_map = {l:i for i, l in enumerate(np.unique(df.label_name.values))}
+    
+    # We processig one image at a time
+    for imagename in tqdm(np.unique(df.image_name.values)):
+        _df = df[df.image_name==imagename]
+        labels = _df.label_name.values
+        labels = torch.tensor([label_map[l] for l in labels])
+
+        bboxes = np.array([_df.bbox_x, _df.bbox_y, _df.bbox_width, _df.bbox_height]).T # xywh
+        bboxes = torch.tensor(bboxes)
+        # bboxes = box_convert(boxes=bboxes, in_fmt="xywh", out_fmt="xyxy").numpy()
+        image_path = os.path.join(data_config.val_dir, imagename)
+        image_source, image = load_image(image_path)
+        h, w, _ = image_source.shape
+
+        targets = {
+            'boxes': bboxes.to('cuda'),
+            'size': (h,w), # im size
+            'labels': labels.to('cuda') # labels int
+        }
+
+        
+        # pred_boxes,pred_logits,pred_phrases
+        _outputs = predict(model, image, text_prompt, 0.25, 0.15, 'cuda', True)
+        
+        outputs = {
+            'pred_boxes':_outputs[0].unsqueeze(0),
+            'pred_logits':_outputs[1],
+            'pred_phrases':_outputs[2]
+        }
+
+        import pdb;pdb.set_trace()
+        loss_dict=criterion(outputs, targets, captions=text_prompt, tokenizer=model.tokenizer)
+
+        print()
+
+
+        # h, w, _ = image_source.shape
+        # pred_boxes = pred_boxes * torch.Tensor([w, h, w, h])
+        # pred_boxes = box_convert(boxes=pred_boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
+
+
+
+
+
+
+
+
+    # Old val
+
     visualizer = GroundingDINOVisualizer(save_dir="visualizations")
 
     all_metrics = {
