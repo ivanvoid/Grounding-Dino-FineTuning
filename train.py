@@ -231,7 +231,7 @@ class GroundingDINOTrainer:
         """Save checkpoint with EMA and scheduler state""" 
         if use_lora:
             lora_state_dict = get_peft_model_state_dict(self.model)
-            print(lora_state_dict)
+            # print(lora_state_dict)
             checkpoint = {
             'epoch': epoch,
             'model': lora_state_dict,
@@ -337,5 +337,6 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
 
             
 if __name__ == "__main__":
-    train('configs/train_config.yaml')
+    # train('configs/train_config.yaml')
     # train('configs/custum_train_config.yaml')
+    train('configs/tiny_config.yaml')

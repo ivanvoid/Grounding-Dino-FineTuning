@@ -112,15 +112,14 @@ def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
     return image, image_transformed
 
 
-
-@torch.no_grad()
 class GroundingDINOVisualizer:
+    @torch.no_grad()
     def __init__(self, save_dir, visualize_frequency=50):
         self.save_dir = save_dir
         self.visualize_frequency = visualize_frequency
         self.pred_annotator = sv.BoxAnnotator(
             color=sv.Color.red(),
-            thickness=8,
+            thickness=4, # 8
             text_scale=0.8,
             text_padding=3
         )

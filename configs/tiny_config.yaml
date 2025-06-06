@@ -1,0 +1,22 @@
+data:
+  train_ann: multimodal-data/DINO_TinyTest/train_annotations.csv
+  train_dir: multimodal-data/DINO_TinyTest/images/train
+  val_ann: multimodal-data/DINO_TinyTest/val_annotations.csv
+  val_dir: multimodal-data/DINO_TinyTest/images/val
+  batch_size: 4
+  num_workers: 8
+
+model:
+  config_path: "groundingdino/config/GroundingDINO_SwinT_OGC.py"
+  weights_path: "weights/groundingdino_swint_ogc.pth"
+  lora_weights: weights/20250527_1516/checkpoint_epoch_5.pth
+
+training:
+  num_epochs: 15
+  learning_rate: 1e-3
+  save_dir: "weights"
+  save_frequency: 1
+  warmup_epochs: 1
+  use_lora: true
+  lora_rank: 32
+  visualization_frequency: 1

@@ -5,6 +5,7 @@ from tqdm import tqdm
 from config import ConfigurationManager, DataConfig, ModelConfig
 from groundingdino.util.inference import load_model, load_image, predict, annotate
 from train import setup_data_loaders, GroundingDINOTrainer
+from groundingdino.util.inference import GroundingDINOVisualizer
 
 def validate(model, captions, data_config):
 
@@ -29,6 +30,8 @@ def validate(model, captions, data_config):
         'giou':[]
     }
 
+    visualizer = GroundingDINOVisualizer(save_dir='visualizations')
+
     with torch.no_grad():
         for batch in tqdm(val_loader):
             images, targets, captions = trainer.prepare_batch(batch)
@@ -46,35 +49,24 @@ def validate(model, captions, data_config):
             metrics['umacc'] += [pred_acc['UnMatched_Token_Accuracy'].item()]
             metrics['giou'] += [1 - loss_dict['loss_giou'].item()]
 
+        epoch = 0
+        visualizer.visualize_epoch(model, val_loader, epoch, trainer.prepare_batch, box_th=0.3, txt_th= 0.2)
+
+
     for k,v in metrics.items():
         print(f'{k} : {np.mean(v)} ± {np.std(v)}')
 
-            # import pdb;pdb.set_trace()
-            # print()
-
-            # # Accumulate losses
-            # for k, v in loss_dict.items():
-            #     val_losses[k] += v.item()
-                
-            # val_losses['total_loss'] += sum(
-            #     loss_dict[k] * self.weights_dict[k] 
-            #     for k in loss_dict.keys() if k in self.weights_dict_loss).item()
-            # num_batches += 1
-
-            # # Average losses
-            # return {k: v/num_batches for k, v in val_losses.items()}
-
-
-    pass
 
 def main():
     # config_path="configs/test_config.yaml"
     # text_prompt="shirt .bag .pants"
     
 
-    config_path="configs/custum_test_config.yaml"
-    text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
+    # config_path="configs/custum_test_config.yaml"
+    # text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
 
+    config_path="configs/tiny_config.yaml"
+    text_prompt="wire. power supply. connector. terminal."
 
 
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
