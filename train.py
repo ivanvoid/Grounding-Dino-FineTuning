@@ -1,3 +1,6 @@
+from setproctitle import setproctitle
+setproctitle("G-DINO-Train")
+
 import os
 import yaml
 import torch
@@ -20,15 +23,19 @@ from groundingdino.datasets.dataset import GroundingDINODataset
 from groundingdino.util.losses import SetCriterion
 from config import ConfigurationManager, DataConfig, ModelConfig
 
+from groundingdino.util.misc import MetricLogger, SmoothedValue
+from groundingdino.datasets.cocogrounding_eval import CocoGroundingEvaluator
+
 # Ignore tokenizer warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
     
 
-def setup_model(model_config: ModelConfig, use_lora: bool=False) -> torch.nn.Module:
+def setup_model(model_config: ModelConfig, use_lora: bool=False, lora_rank:int=32) -> torch.nn.Module:
     return load_model(
         model_config.config_path,
         model_config.weights_path,
         use_lora=use_lora,
+        lora_rank=lora_rank
     ).to('cuda:0')
 
 def setup_data_loaders(config: DataConfig) -> tuple[DataLoader, DataLoader]:
@@ -224,7 +231,7 @@ class GroundingDINOTrainer:
 
 
     def get_ema_model(self):
-        """Return EMA model for evaluation"""
+        """Return EMA model for evaluation""" # ???
         return self.ema_model.ema_model
 
     def save_checkpoint(self, path, epoch, losses, use_lora=False):
@@ -249,6 +256,189 @@ class GroundingDINOTrainer:
             }
         torch.save(checkpoint, path)
 
+    @torch.no_grad()
+    def evaluate(self, model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None, verbose=False):
+        if verbose:
+            print('Evaluating...')
+        from tqdm import tqdm 
+        model.eval()
+        criterion.eval()
+
+        # Get GT
+        from pycocotools.coco import COCO
+        import numpy as np
+        cocoGt = COCO(args.coco_val_path)
+
+        # Sanaty check 
+        import json
+        # import pdb;pdb.set_trace()
+        with open(args.coco_val_path) as f:
+            data = json.load(f)  
+        
+        # Check if ids are valid
+        ids = [row['id'] for row in data['images']]
+        assert len(ids) == np.unique(ids).shape[0]
+        ids = [row['id'] for row in data['annotations']]
+        assert len(ids) == np.unique(ids).shape[0]
+
+        # check if categories are valid
+        catid = [row['category_id'] for row in data['annotations']]
+        assert 0 not in np.unique(catid)
+
+        assert np.all([row['bbox'][2]*row['bbox'][3]==row['area'] for row in data['annotations']])
+
+        # print(cocoGt)
+        # imgIds=sorted(cocoGt.getImgIds())
+        # imgIds=imgIds[0:50]
+        # imgId = imgIds[np.random.randint(50)]
+
+        # Get Prediction
+        ## predict and save results as coco format
+        
+        # [{"image_id":42,"category_id":18,"bbox":[258.15,41.29,348.26,243.78],"score":0.236},
+
+        pred_coco = []
+        #     "info": {
+        #         "description": "Dataset description",
+        #         "url": "http://example.com",
+        #         "version": "1.0",
+        #         "year": 2025,
+        #         "contributor": "Ivan K",
+        #         "date_created": "2025-06-09"
+        #         },
+        #     "images": [],
+        #     "annotations": [],
+        #     "categories": [],
+        # }
+
+        _, target = data_loader.dataset[0]
+        all_classes = target['str_cls_lst']
+        print(all_classes)
+        # for i, name in enumerate(all_classes):
+        #     pred_coco['categories'] += [{
+        #         "id":i,
+        #         "name":name
+        #     }]
+        # import pdb;pdb.set_trace()
+        image_id = 0
+        # count = 0
+        for image, target in tqdm(data_loader.dataset):
+            image_id += 1
+            # pred_coco['images'] += [{
+            #     "id":image_id,
+            #     "file_name":target['img_path'].split('/')[-1],
+            #     "width":target['size'][1].item(),
+            #     "height":target['size'][0].item()
+            # }]
+
+            from groundingdino.util.inference import predict
+            boxes, logits, phrases = predict(
+                model, image, target['caption'], 0.2, 0.2)
+
+            ## POST-PROCESS
+            # import pdb;pdb.set_trace()
+            h, w = target['size']
+            boxes = boxes * torch.Tensor([w, h, w, h]) # cxcywh
+            from groundingdino.util.box_ops import box_cxcywh_to_xyxy
+            xyxy = box_cxcywh_to_xyxy(boxes).numpy()
+            xyxy = torch.tensor(xyxy) #.int()
+            boxes = torch.cat([xyxy[:,:2], boxes[:,2:]], 1) # xywh -> COCO prediction format
+
+            for jj in range(logits.shape[0]):
+                # count += 1
+                c_id = np.where(np.array(all_classes) == phrases[jj])
+
+                if len(c_id[0]) == 0:
+                    # if prediction is wrong 
+                    continue
+
+                # pred_coco['annotations'] += [{
+                pred_coco += [{
+                    # "id":count,
+                    "image_id":image_id,
+                    "category_id":int(c_id[0][0]) + 1,
+                    "bbox":boxes[jj].tolist(),
+                    "score":logits[jj].item(),
+                    # "area":boxes[jj].tolist()[2]*boxes[jj].tolist()[3]
+                }]
+        
+        # import pdb;pdb.set_trace()
+        # print('wait...')
+        
+        import json
+        with open('pred_coco.json', 'w') as f:
+            json.dump(pred_coco, f)
+
+
+        # for batch in data_loader: # val_loader
+        #     images, targets, captions = self.prepare_batch(batch)
+        #     outputs = model(images, captions=captions)
+        #     print()
+
+
+        # cocoDt = None
+        resFile = 'pred_coco.json'
+        cocoDt = cocoGt.loadRes(resFile)
+
+        # Compute 
+        annType = ['segm','bbox','keypoints']
+        annType = annType[1]
+        from pycocotools.cocoeval import COCOeval
+        cocoEval = COCOeval(cocoGt, cocoDt, annType)
+
+        imgIds=sorted(cocoGt.getImgIds())
+        cocoEval.params.imgIds  = imgIds
+        cocoEval.params.iouThrs = np.linspace(.1, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
+        # cocoEval.params.maxDets = [100]
+
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()
+
+        ##################################################
+        ##################################################
+        ##################################################
+
+
+
+
+        # metric_logger = MetricLogger(delimiter="  ")
+        # if not wo_class_error:
+        #     metric_logger.add_meter('class_error', SmoothedValue(window_size=1, fmt='{value:.2f}'))
+        # header = 'Test:'
+
+        # iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+        # useCats = True
+        # try:
+        #     useCats = args.useCats
+        # except:
+        #     useCats = True
+        # if not useCats:
+        #     print("useCats: {} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".format(useCats))
+        
+        # import pdb;pdb.set_trace()
+        # coco_evaluator = CocoGroundingEvaluator(base_ds, iou_types, useCats=useCats)
+
+
+        # if args.use_coco_eval:
+        #     from pycocotools.coco import COCO
+        #     coco = COCO(args.coco_val_path)
+        #     # 获取所有类别
+        #     category_dict = coco.loadCats(coco.getCatIds())
+        #     cat_list = [item['name'] for item in category_dict]
+        # else:
+        #     cat_list=args.label_list
+        # caption = " . ".join(cat_list) + ' .'
+        # print("Input text prompt:", caption)
+        # criterion.eval()
+
+        # metric_logger = MetricLogger(delimiter="  ")
+        # if not wo_class_error:
+        #     metric_logger.add_meter('class_error',SmoothedValue(window_size=1, fmt='{value:.2f}'))
+        # header = 'Test:'
+
+
+
 def train(config_path: str, save_dir: Optional[str] = None) -> None:
     """
     Main training function with configuration management
@@ -260,7 +450,7 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
 
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
 
-    model = setup_model(model_config, training_config.use_lora)
+    model = setup_model(model_config, training_config.use_lora, training_config.lora_rank)
     
     if save_dir:
         training_config.save_dir = save_dir
@@ -337,6 +527,6 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
 
             
 if __name__ == "__main__":
-    # train('configs/train_config.yaml')
+    train('configs/train_config.yaml')
     # train('configs/custum_train_config.yaml')
-    train('configs/tiny_config.yaml')
+    # train('configs/tiny_config.yaml')

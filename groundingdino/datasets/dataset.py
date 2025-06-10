@@ -68,7 +68,8 @@ class GroundingDINODataset(Dataset):
             'str_cls_lst': str_cls_lst,  
             'caption': captions,
             'labels': classes, 
-            'cat2tokenspan': cat2tokenspan
+            'cat2tokenspan': cat2tokenspan,
+            'img_path':img_path, # For COCOEval
         }
 
         return image, target

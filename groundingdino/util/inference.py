@@ -130,7 +130,7 @@ class GroundingDINOVisualizer:
             text_padding=3
         )
 
-    def extract_phrases(self, logits, tokenized, tokenizer, text_threshold=0.2):
+    def extract_phrases(self, logits, tokenized, tokenizer, text_threshold=0.2, ret_list=False):
         """Extract phrases from logits using tokenizer
         Args:
             logits (torch.Tensor): Prediction logits [num_queries, seq_len]
@@ -157,7 +157,10 @@ class GroundingDINOVisualizer:
             if valid_tokens:
                 phrase = tokenizer.decode(valid_tokens)
                 conf = logit.max().item()
-                phrases.append(f"{phrase} ({conf:.2f})")
+                if not ret_list:
+                    phrases.append(f"{phrase} ({conf:.2f})")
+                else:
+                    phrases.append([phrase, conf])
             
         return phrases
     
@@ -353,7 +356,8 @@ def predict(
         box_threshold: float,
         text_threshold: float,
         device: str = "cuda",
-        remove_combined: bool = False
+        remove_combined: bool = False,
+        collapse_logits=True
 ) -> Tuple[torch.Tensor, torch.Tensor, List[str]]:
     caption = preprocess_caption(caption=caption)
 
@@ -390,7 +394,10 @@ def predict(
             in logits
         ]
 
-    return boxes, logits.max(dim=1)[0], phrases
+    if collapse_logits:
+        return boxes, logits.max(dim=1)[0], phrases
+    else:
+        return boxes, logits, phrases
 
 def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor, phrases: List[str]) -> np.ndarray:
     h, w, _ = image_source.shape

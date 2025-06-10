@@ -7,13 +7,13 @@ data:
   val_dir: multimodal-data/fashion_dataset_subset/images/val
 model:
   config_path: groundingdino/config/GroundingDINO_SwinT_OGC.py
-  lora_weights: weights/20250527_1516/checkpoint_epoch_5.pth
+  lora_weights: weights/20250527_1516/checkpoint_epoch_15.pth
   weights_path: weights/groundingdino_swint_ogc.pth
 training:
   learning_rate: 0.0001
   num_epochs: 200
   save_dir: weights
   save_frequency: 5
-  use_lora: false
+  use_lora: True
   visualization_frequency: 5
   warmup_epochs: 5
