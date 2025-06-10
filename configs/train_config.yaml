@@ -11,10 +11,11 @@ model:
   weights_path: "weights/groundingdino_swint_ogc.pth"
 
 training:
-  num_epochs: 200
+  num_epochs: 20
   learning_rate: 1e-3
   save_dir: "weights"
-  save_frequency: 3
+  save_frequency: 1
   warmup_epochs: 5
   use_lora: true
+  lora_rank: 32
   visualization_frequency: 5

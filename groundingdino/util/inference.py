@@ -40,7 +40,7 @@ def load_weights(model:torch.nn.Module,checkpoint:dict,strict:bool=False):
         model.load_state_dict(clean_state_dict(checkpoint), strict=strict)
 
 
-def load_model(model_config, use_lora: bool = False, device: str = "cuda", strict: bool = False):
+def load_model(model_config, use_lora: bool = False, device: str = "cuda", strict: bool = False, lora_rank:int=32):
     args = SLConfig.fromfile(model_config.config_path)
     args.device = device
     model = build_model(args)
@@ -50,7 +50,7 @@ def load_model(model_config, use_lora: bool = False, device: str = "cuda", stric
         base_ckpt = torch.load(model_config.weights_path, map_location="cpu")
         load_weights(model, base_ckpt, strict=False)
         print(f"Adding Lora to Model!")
-        model = add_lora_to_model(model) # transforms the model to `PeftModel` object
+        model = add_lora_to_model(model, rank=lora_rank) # transforms the model to `PeftModel` object
         lora_ckpt = torch.load(model_config.lora_weigths, map_location="cpu")
         # Rename LoRA checkpoint keys
         print("Renaming LoRA checkpoint keys to match model structure")
@@ -64,6 +64,7 @@ def load_model(model_config, use_lora: bool = False, device: str = "cuda", stric
         for key, value in lora_ckpt_state_dict.items():
             new_key = key.replace(".lora_A.weight", ".lora_A.default.weight").replace(".lora_B.weight", ".lora_B.default.weight")
             # Handle modules_to_save
+            
             for module_name in modules_to_save:
                 if module_name in key:
                     new_key = new_key.replace(".weight", ".original_module.weight").replace(".bias", ".original_module.bias")

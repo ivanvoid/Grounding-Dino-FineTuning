@@ -1,6 +1,3 @@
-from setproctitle import setproctitle
-setproctitle("G-DINO-Eval")
-
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -15,6 +12,8 @@ import torch.nn as nn
 from torchvision.ops.boxes import nms
 from groundingdino.util import box_ops, get_tokenlizer
 
+from setproctitle import setproctitle
+setproctitle("G-DINO-Eval")
 
 def create_positive_map(tokenized, tokens_positive,cat_list,caption):
     """construct a map such that positive_map[i,j] = True iff box i is associated to token j"""
@@ -172,11 +171,20 @@ def validate(model, captions, data_config):
     postprocessors = {'bbox': PostProcess(num_select=args.num_select  , text_encoder_type=args.text_encoder_type,nms_iou_threshold=args.nms_iou_threshold,args=args)}
     """
     from types import SimpleNamespace
+    # coco_dir = './multimodal-data/dataset_coco/'
+    # args = {
+    #     'use_coco_eval':False,
+    #     'coco_val_path':'./multimodal-data/dataset_coco/annotations.json',
+    #     'label_list': ['bag', 'shirt', 'bag']
+    # }
+    coco_dir = './multimodal-data/GAI20II_COCO/'
     args = {
         'use_coco_eval':False,
-        'coco_val_path':'./multimodal-data/dataset_coco/annotations.json',
-        'label_list': ['bag', 'shirt', 'bag']
+        'coco_val_path':'./multimodal-data/GAI20II_COCO/annotations.json',
+        'label_list': ['crimpers', 'cutter', 'drill', 'hammer', 'hand file', 'measurement tape', 'pen', 'pendant control', 'pliers', 'power supply', 'scissors', 'screwdriver', 'screws', 'tape', 'tweezers', 'usb cable', 'vernier caliper', 'whiteboard marker', 'wire', 'wrench']
     }
+
+
     args = SimpleNamespace(**args)
 
     postprocessors = {'bbox': PostProcess(num_select=100,text_encoder_type='bert-base-uncased', nms_iou_threshold=0.5,args=args)}
@@ -186,7 +194,7 @@ def validate(model, captions, data_config):
         criterion=trainer.criterion,
         postprocessors=postprocessors,
         data_loader=val_loader,
-        base_ds='./multimodal-data/dataset_coco/', # coco dataset basedir
+        base_ds=coco_dir, # coco dataset basedir
         device='cuda',
         output_dir='./output_eval_coco_dir',
         wo_class_error=False,
@@ -194,32 +202,19 @@ def validate(model, captions, data_config):
         logger=None,
         verbose=True)
 
-    # visualizer = GroundingDINOVisualizer(save_dir='visualizations')
-
-    # with torch.no_grad():
-    #     for batch in tqdm(val_loader):
-    #         images, targets, captions = trainer.prepare_batch(batch)
-    #         outputs = model(images, captions=captions)
-            
-    #         # Calculate losses
-    #         loss_dict = trainer.criterion(
-    #             outputs, targets, 
-    #             captions=captions, 
-    #             tokenizer=trainer.model.tokenizer)
-            
-            
-    #         # mAP(model, visualizer, outputs, targets)
-    #         pred_acc = trainer.criterion.get_accuracy(outputs, targets)
-
-    #     visualizer.visualize_epoch(model, val_loader, 0, trainer.prepare_batch, box_th=0.3, txt_th= 0.2)
 
 
 def main():
-    config_path="configs/test_config.yaml"
-    text_prompt="shirt .bag .pants"
+    # config_path="configs/test_config.yaml"
+    # text_prompt="shirt .bag .pants"
     
+    config_path="configs/custum_test_config.yaml"
+    text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
+    
+
+
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
-    model = load_model(model_config,training_config.use_lora)
+    model = load_model(model_config,training_config.use_lora, lora_rank=training_config.lora_rank)
     
     validate(model, text_prompt, data_config)
 

@@ -1,6 +1,3 @@
-from setproctitle import setproctitle
-setproctitle("G-DINO-Train")
-
 import os
 import yaml
 import torch
@@ -28,7 +25,10 @@ from groundingdino.datasets.cocogrounding_eval import CocoGroundingEvaluator
 
 # Ignore tokenizer warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    
+
+from setproctitle import setproctitle
+setproctitle("G-DINO-Train")
+
 
 def setup_model(model_config: ModelConfig, use_lora: bool=False, lora_rank:int=32) -> torch.nn.Module:
     return load_model(
@@ -287,53 +287,24 @@ class GroundingDINOTrainer:
 
         assert np.all([row['bbox'][2]*row['bbox'][3]==row['area'] for row in data['annotations']])
 
-        # print(cocoGt)
-        # imgIds=sorted(cocoGt.getImgIds())
-        # imgIds=imgIds[0:50]
-        # imgId = imgIds[np.random.randint(50)]
-
         # Get Prediction
         ## predict and save results as coco format
-        
-        # [{"image_id":42,"category_id":18,"bbox":[258.15,41.29,348.26,243.78],"score":0.236},
-
         pred_coco = []
-        #     "info": {
-        #         "description": "Dataset description",
-        #         "url": "http://example.com",
-        #         "version": "1.0",
-        #         "year": 2025,
-        #         "contributor": "Ivan K",
-        #         "date_created": "2025-06-09"
-        #         },
-        #     "images": [],
-        #     "annotations": [],
-        #     "categories": [],
-        # }
 
         _, target = data_loader.dataset[0]
         all_classes = target['str_cls_lst']
         print(all_classes)
-        # for i, name in enumerate(all_classes):
-        #     pred_coco['categories'] += [{
-        #         "id":i,
-        #         "name":name
-        #     }]
-        # import pdb;pdb.set_trace()
+
         image_id = 0
-        # count = 0
+
         for image, target in tqdm(data_loader.dataset):
             image_id += 1
-            # pred_coco['images'] += [{
-            #     "id":image_id,
-            #     "file_name":target['img_path'].split('/')[-1],
-            #     "width":target['size'][1].item(),
-            #     "height":target['size'][0].item()
-            # }]
 
             from groundingdino.util.inference import predict
-            boxes, logits, phrases = predict(
-                model, image, target['caption'], 0.2, 0.2)
+            # import pdb;pdb.set_trace()
+            # boxes, logits, phrases = predict(model, image, target['caption'], 0.3, 0.2)
+            # boxes, logits, phrases = predict(model, image, target['caption'], 0.3, 0.2, remove_combined=True);print(phrases)
+            boxes, logits, phrases = predict(model, image, target['caption'], 0.3, 0.2, remove_combined=True)
 
             ## POST-PROCESS
             # import pdb;pdb.set_trace()
@@ -344,6 +315,7 @@ class GroundingDINOTrainer:
             xyxy = torch.tensor(xyxy) #.int()
             boxes = torch.cat([xyxy[:,:2], boxes[:,2:]], 1) # xywh -> COCO prediction format
 
+            print(phrases)
             for jj in range(logits.shape[0]):
                 # count += 1
                 c_id = np.where(np.array(all_classes) == phrases[jj])
@@ -369,18 +341,11 @@ class GroundingDINOTrainer:
         with open('pred_coco.json', 'w') as f:
             json.dump(pred_coco, f)
 
-
-        # for batch in data_loader: # val_loader
-        #     images, targets, captions = self.prepare_batch(batch)
-        #     outputs = model(images, captions=captions)
-        #     print()
-
-
-        # cocoDt = None
+        # Result file 
         resFile = 'pred_coco.json'
         cocoDt = cocoGt.loadRes(resFile)
 
-        # Compute 
+        # Compute
         annType = ['segm','bbox','keypoints']
         annType = annType[1]
         from pycocotools.cocoeval import COCOeval
@@ -484,6 +449,8 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
          print( f"Is only Lora trainable?  {verify_only_lora_trainable(model)} ")
 
     print_frozen_status(model)
+    
+    # import pdb;pdb.set_trace()
 
     trainer = GroundingDINOTrainer(
         model,
@@ -493,6 +460,10 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
         learning_rate=training_config.learning_rate,
         use_lora=training_config.use_lora
     )   
+    trainer.save_checkpoint(
+        os.path.join(save_dir, f'checkpoint_epoch_{0}.pth'),0,999,
+        use_lora=training_config.use_lora
+    )
     # Training loop
     for epoch in range(training_config.num_epochs):
         if epoch % training_config.visualization_frequency == 0:
@@ -506,11 +477,11 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
             for k, v in losses.items():
                 epoch_losses[k].append(v)
             
-            if batch_idx % 5 == 0:
-                loss_str = ", ".join(f"{k}: {v:.4f}" for k, v in losses.items())
-                print(f"Epoch {epoch+1}/{training_config.num_epochs}, "
-                      f"Batch {batch_idx}/{len(train_loader)}, {loss_str}")
-                print(f"Learning rate: {trainer.optimizer.param_groups[0]['lr']:.6f}")
+            # if batch_idx % 5 == 0:
+            #     loss_str = ", ".join(f"{k}: {v:.4f}" for k, v in losses.items())
+            #     print(f"Epoch {epoch+1}/{training_config.num_epochs}, "
+            #           f"Batch {batch_idx}/{len(train_loader)}, {loss_str}")
+            #     print(f"Learning rate: {trainer.optimizer.param_groups[0]['lr']:.6f}")
 
         avg_losses = {k: sum(v)/len(v) for k, v in epoch_losses.items()}
         print(f"Epoch {epoch+1} complete. Average losses:",
@@ -527,6 +498,6 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
 
             
 if __name__ == "__main__":
-    train('configs/train_config.yaml')
-    # train('configs/custum_train_config.yaml')
+    # train('configs/train_config.yaml')
+    train('configs/custum_train_config.yaml')
     # train('configs/tiny_config.yaml')

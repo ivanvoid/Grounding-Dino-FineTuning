@@ -76,7 +76,8 @@ def convert_to_coco(df):
 
 
 def main():
-    dataset_path = './multimodal-data/fashion_dataset_subset/val_annotations.csv'
+    # dataset_path = './multimodal-data/fashion_dataset_subset/val_annotations.csv'
+    dataset_path = './multimodal-data/DINO_GAI20II/val_annotations.csv'
 
     df = pd.read_csv(dataset_path)
 
