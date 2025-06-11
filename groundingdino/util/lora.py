@@ -57,9 +57,8 @@ def add_lora_to_model(model, rank=32, inference=False):
 
     config = LoraConfig(
         r=rank,
-        lora_alpha=rank, # x2 for big datasets
-        # init_lora_weights="pissa", # new
-        target_modules=[
+        lora_alpha=0*rank, # x2 for big datasets
+        target_modules=[ # Old original settings
             # Decoder cross attention
             "cross_attn.sampling_offsets",
             "cross_attn.attention_weights", 
@@ -78,17 +77,19 @@ def add_lora_to_model(model, rank=32, inference=False):
             # fearue map
             "feat_map"
         ],
+
         modules_to_save=["bbox_embed.0.layers.2"],
         bias="none",
         inference_mode=inference,
+        # lora_dropout=0.1, # new
     )
     # print("\nAll Model Layers:")
     # for name, module in model.named_modules():
-    #    if 'bbox' in name:
-        #    print(f"full path: {name}")
-        # print(name)
-
+    # #    if 'bbox' in name:
+    # #        print(f"full path: {name}")
+    #     print(name)
     # import pdb;pdb.set_trace()
+
     print("Converting model to LoRA...")
     model = get_peft_model(model, config)
 

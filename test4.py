@@ -155,6 +155,8 @@ def validate(model, captions, data_config):
 
     _, val_loader = setup_data_loaders(data_config)
 
+
+
     trainer = GroundingDINOTrainer(
         model,
         num_steps_per_epoch=1,
@@ -163,6 +165,12 @@ def validate(model, captions, data_config):
         learning_rate=0.1,
         use_lora=True
     )
+
+    visualizer = GroundingDINOVisualizer(save_dir='./outputs')
+    visualizer.visualize_epoch(
+        model, val_loader, -1, trainer.prepare_batch, box_th=0.3, txt_th= 0.2)
+    exit()
+    
     """
     criterion = SetCriterion(matcher=matcher, weight_dict=weight_dict,
                              focal_alpha=args.focal_alpha, focal_gamma=args.focal_gamma,losses=losses
@@ -210,12 +218,16 @@ def main():
     
     config_path="configs/custum_test_config.yaml"
     text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
-    
 
 
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
-    model = load_model(model_config,training_config.use_lora, lora_rank=training_config.lora_rank)
-    
+    model = load_model(
+        model_config, 
+        training_config.use_lora, 
+        lora_rank=training_config.lora_rank,
+        inference=True
+    )
+
     validate(model, text_prompt, data_config)
 
 def main_test():

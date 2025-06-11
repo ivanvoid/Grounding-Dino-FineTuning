@@ -260,13 +260,15 @@ class GroundingDINOTrainer:
     def evaluate(self, model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None, verbose=False):
         if verbose:
             print('Evaluating...')
+        from groundingdino.util.inference import predict
+        from pycocotools.coco import COCO
+        import numpy as np
         from tqdm import tqdm 
+
         model.eval()
         criterion.eval()
 
         # Get GT
-        from pycocotools.coco import COCO
-        import numpy as np
         cocoGt = COCO(args.coco_val_path)
 
         # Sanaty check 
@@ -300,11 +302,15 @@ class GroundingDINOTrainer:
         for image, target in tqdm(data_loader.dataset):
             image_id += 1
 
-            from groundingdino.util.inference import predict
+            
             # import pdb;pdb.set_trace()
             # boxes, logits, phrases = predict(model, image, target['caption'], 0.3, 0.2)
             # boxes, logits, phrases = predict(model, image, target['caption'], 0.3, 0.2, remove_combined=True);print(phrases)
-            boxes, logits, phrases = predict(model, image, target['caption'], 0.3, 0.2, remove_combined=True)
+            boxes, logits, phrases = predict(
+                model, image, target['caption'], 0.3, 0.2, remove_combined=True)
+            # boxes, logits, phrases = predict(
+            #     model, image, target['caption'], 0.3, 0.2)
+            
 
             ## POST-PROCESS
             # import pdb;pdb.set_trace()
@@ -356,53 +362,14 @@ class GroundingDINOTrainer:
         cocoEval.params.iouThrs = np.linspace(.1, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
         # cocoEval.params.maxDets = [100]
 
+        # import pdb;pdb.set_trace()
         cocoEval.evaluate()
         cocoEval.accumulate()
         cocoEval.summarize()
 
-        ##################################################
-        ##################################################
-        ##################################################
+        # os.remove('pred_coco.json')
 
-
-
-
-        # metric_logger = MetricLogger(delimiter="  ")
-        # if not wo_class_error:
-        #     metric_logger.add_meter('class_error', SmoothedValue(window_size=1, fmt='{value:.2f}'))
-        # header = 'Test:'
-
-        # iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
-        # useCats = True
-        # try:
-        #     useCats = args.useCats
-        # except:
-        #     useCats = True
-        # if not useCats:
-        #     print("useCats: {} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".format(useCats))
-        
-        # import pdb;pdb.set_trace()
-        # coco_evaluator = CocoGroundingEvaluator(base_ds, iou_types, useCats=useCats)
-
-
-        # if args.use_coco_eval:
-        #     from pycocotools.coco import COCO
-        #     coco = COCO(args.coco_val_path)
-        #     # 获取所有类别
-        #     category_dict = coco.loadCats(coco.getCatIds())
-        #     cat_list = [item['name'] for item in category_dict]
-        # else:
-        #     cat_list=args.label_list
-        # caption = " . ".join(cat_list) + ' .'
-        # print("Input text prompt:", caption)
-        # criterion.eval()
-
-        # metric_logger = MetricLogger(delimiter="  ")
-        # if not wo_class_error:
-        #     metric_logger.add_meter('class_error',SmoothedValue(window_size=1, fmt='{value:.2f}'))
-        # header = 'Test:'
-
-
+        return cocoEval.stats
 
 def train(config_path: str, save_dir: Optional[str] = None) -> None:
     """
@@ -484,8 +451,10 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
             #     print(f"Learning rate: {trainer.optimizer.param_groups[0]['lr']:.6f}")
 
         avg_losses = {k: sum(v)/len(v) for k, v in epoch_losses.items()}
-        print(f"Epoch {epoch+1} complete. Average losses:",
-              ", ".join(f"{k}: {v:.4f}" for k, v in avg_losses.items()))
+        print(f"Epoch {epoch+1} complete.\nAverage losses:",
+              ", ".join(f"{k}: {v:.4f}" for k, v in avg_losses.items()), 
+              f' LR: {trainer.optimizer.param_groups[0]['lr']:.6f}')
+
         
         # Save checkpoint
         if (epoch + 1) % training_config.save_frequency == 0:

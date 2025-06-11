@@ -40,7 +40,7 @@ def load_weights(model:torch.nn.Module,checkpoint:dict,strict:bool=False):
         model.load_state_dict(clean_state_dict(checkpoint), strict=strict)
 
 
-def load_model(model_config, use_lora: bool = False, device: str = "cuda", strict: bool = False, lora_rank:int=32):
+def load_model(model_config, use_lora: bool = False, device: str = "cuda", strict: bool = False, lora_rank:int=32, inference=False):
     args = SLConfig.fromfile(model_config.config_path)
     args.device = device
     model = build_model(args)
@@ -50,7 +50,7 @@ def load_model(model_config, use_lora: bool = False, device: str = "cuda", stric
         base_ckpt = torch.load(model_config.weights_path, map_location="cpu")
         load_weights(model, base_ckpt, strict=False)
         print(f"Adding Lora to Model!")
-        model = add_lora_to_model(model, rank=lora_rank) # transforms the model to `PeftModel` object
+        model = add_lora_to_model(model, rank=lora_rank, inference=inference) # transforms the model to `PeftModel` object
         lora_ckpt = torch.load(model_config.lora_weigths, map_location="cpu")
         # Rename LoRA checkpoint keys
         print("Renaming LoRA checkpoint keys to match model structure")
@@ -195,6 +195,16 @@ class GroundingDINOVisualizer:
                 tokenized = outputs['tokenized']
                 phrases = self.extract_phrases(filtered_logits, tokenized, model.tokenizer, text_threshold=txt_th)
 
+                # Draw ground truth
+                if "boxes" in targets[0]:
+                    gt_xyxy = box_cxcywh_to_xyxy(targets[0]["boxes"]).cpu().numpy()
+                    gt_detections = sv.Detections(xyxy=gt_xyxy)
+                    img_bgr = self.gt_annotator.annotate(
+                        scene=img_bgr,
+                        detections=gt_detections,
+                        labels=targets[0].get("str_cls_lst", None)
+                    )
+
                 # Draw predictions
                 if len(filtered_boxes):
                     boxes = filtered_boxes * torch.tensor([w, h, w, h])
@@ -205,16 +215,6 @@ class GroundingDINOVisualizer:
                         scene=img_bgr,
                         detections=detections,
                         labels=phrases
-                    )
-
-                # Draw ground truth
-                if "boxes" in targets[0]:
-                    gt_xyxy = box_cxcywh_to_xyxy(targets[0]["boxes"]).cpu().numpy()
-                    gt_detections = sv.Detections(xyxy=gt_xyxy)
-                    img_bgr = self.gt_annotator.annotate(
-                        scene=img_bgr,
-                        detections=gt_detections,
-                        labels=targets[0].get("str_cls_lst", None)
                     )
 
                 cv2.imwrite(f"{save_dir}/val_pred_{idx}.jpg", img_bgr)
@@ -368,9 +368,14 @@ def predict(
     with torch.no_grad():
         outputs = model(image[None], captions=[caption])
 
-    prediction_logits = outputs["pred_logits"].cpu().sigmoid()[0]  # prediction_logits.shape = (nq, 256)
-    prediction_boxes = outputs["pred_boxes"].cpu()[0]  # prediction_boxes.shape = (nq, 4)
+    # prediction_logits.shape = (nq, 256)
+    prediction_logits = outputs["pred_logits"].cpu().sigmoid()[0]
+    # prediction_boxes.shape = (nq, 4)
+    prediction_boxes = outputs["pred_boxes"].cpu()[0]  
+    
+    print('MAX PRED LOGITS: ',prediction_logits.max(1)[0].max())
 
+    #The least threshold which is required for object to be useful
     mask = prediction_logits.max(dim=1)[0] > box_threshold
     logits = prediction_logits[mask]  # logits.shape = (n, 256)
     boxes = prediction_boxes[mask]  # boxes.shape = (n, 4)
@@ -378,6 +383,7 @@ def predict(
     tokenizer = model.tokenizer
     tokenized = tokenizer(caption)
     
+    # V2
     if remove_combined:
         sep_idx = [i for i in range(len(tokenized['input_ids'])) if tokenized['input_ids'][i] in [101, 102, 1012]]
         
@@ -394,6 +400,9 @@ def predict(
             for logit
             in logits
         ]
+
+    # V1
+    # phrases = [get_phrases_from_posmap(logit > text_threshold, tokenized, tokenizer).replace('.', '') for logit in logits]
 
     if collapse_logits:
         return boxes, logits.max(dim=1)[0], phrases

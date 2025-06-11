@@ -183,6 +183,7 @@ class SetCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """ 
         # Retrieve the matching between the outputs of the last layer and the targets also returning cls labels to avoid caclulating it during loss
+        # import pdb;pdb.set_trace()
         indices, cls_labels = self.matcher(outputs, targets)
         #print(f"indeices of hungarian matcher are {indices}")
         # Compute all the requested losses
