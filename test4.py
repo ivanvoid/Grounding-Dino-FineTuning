@@ -156,7 +156,6 @@ def validate(model, captions, data_config):
     _, val_loader = setup_data_loaders(data_config)
 
 
-
     trainer = GroundingDINOTrainer(
         model,
         num_steps_per_epoch=1,
@@ -166,6 +165,8 @@ def validate(model, captions, data_config):
         use_lora=True
     )
 
+
+    # this output is identical
     visualizer = GroundingDINOVisualizer(save_dir='./outputs')
     visualizer.visualize_epoch(
         model, val_loader, -1, trainer.prepare_batch, box_th=0.3, txt_th= 0.2)
@@ -213,11 +214,11 @@ def validate(model, captions, data_config):
 
 
 def main():
-    # config_path="configs/test_config.yaml"
-    # text_prompt="shirt .bag .pants"
+    config_path="configs/test_config.yaml"
+    text_prompt="shirt .bag .pants"
     
-    config_path="configs/custum_test_config.yaml"
-    text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
+    # config_path="configs/custum_test_config.yaml"
+    # text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
 
 
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
@@ -225,7 +226,7 @@ def main():
         model_config, 
         training_config.use_lora, 
         lora_rank=training_config.lora_rank,
-        inference=True
+        # inference=True
     )
 
     validate(model, text_prompt, data_config)

@@ -44,7 +44,7 @@ def load_model(model_config, use_lora: bool = False, device: str = "cuda", stric
     args = SLConfig.fromfile(model_config.config_path)
     args.device = device
     model = build_model(args)
-    
+    # import pdb;pdb.set_trace()
     if use_lora:
         # Load base weights
         base_ckpt = torch.load(model_config.weights_path, map_location="cpu")

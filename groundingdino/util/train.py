@@ -36,15 +36,26 @@ def preprocess_caption(caption: str) -> str:
 
 
 def load_model(model_config_path: str, model_checkpoint_path: str, device: str = "cuda", use_lora: bool =False, lora_rank:int=32):
+    torch.manual_seed(2025)
     args = SLConfig.fromfile(model_config_path)
     args.device = device
     model = build_model(args)
+    
+    ## Debug
+    # var = np.sum([x.sum().item() for x in model.parameters()])
+    # print('Sum Build model', var)
+
     checkpoint = torch.load(model_checkpoint_path, map_location="cpu")
     model.load_state_dict(clean_state_dict(checkpoint["model"]), strict=False)
+
+    ## Debug
+    # var = np.sum([x.sum().item() for x in model.parameters()])
+    # print("Sum of load model: ",var)
+
     if use_lora:
-        print(f"Adding Lora to model!")
+        # print(f"Adding Lora to model!")
         model=add_lora_to_model(model, rank=lora_rank)
-        print(f"Lora model is {model}")
+        # print(f"Lora model is {model}")
     return model
 
 

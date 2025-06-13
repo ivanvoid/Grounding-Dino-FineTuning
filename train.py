@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from ema_pytorch import EMA
 from groundingdino.util.train import load_model
 from groundingdino.util.misc import nested_tensor_from_tensor_list
-from groundingdino.util.model_utils import freeze_model_layers,print_frozen_status
+from groundingdino.util.model_utils import freeze_model_layers, print_frozen_status
 from groundingdino.util.matchers import build_matcher
 from groundingdino.util.inference import GroundingDINOVisualizer
 from groundingdino.util.model_utils import freeze_model_layers, print_frozen_status
@@ -30,13 +30,13 @@ from setproctitle import setproctitle
 setproctitle("G-DINO-Train")
 
 
-def setup_model(model_config: ModelConfig, use_lora: bool=False, lora_rank:int=32) -> torch.nn.Module:
+def setup_model(model_config: ModelConfig, use_lora: bool=False, lora_rank:int=32, device='cuda:0') -> torch.nn.Module:
     return load_model(
         model_config.config_path,
         model_config.weights_path,
         use_lora=use_lora,
         lora_rank=lora_rank
-    ).to('cuda:0')
+    ).to(device)
 
 def setup_data_loaders(config: DataConfig) -> tuple[DataLoader, DataLoader]:
 
@@ -236,6 +236,7 @@ class GroundingDINOTrainer:
 
     def save_checkpoint(self, path, epoch, losses, use_lora=False):
         """Save checkpoint with EMA and scheduler state""" 
+        # import pdb;pdb.set_trace()
         if use_lora:
             lora_state_dict = get_peft_model_state_dict(self.model)
             # print(lora_state_dict)
@@ -255,6 +256,11 @@ class GroundingDINOTrainer:
                 'losses': losses,
             }
         torch.save(checkpoint, path)
+        
+        ## Debug
+        import numpy as np
+        var = np.sum([x.sum().item() for x in self.model.parameters()])
+        print("Sum of load model: ", var)
 
     @torch.no_grad()
     def evaluate(self, model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None, verbose=False):
@@ -428,14 +434,11 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
         use_lora=training_config.use_lora
     )   
     trainer.save_checkpoint(
-        os.path.join(save_dir, f'checkpoint_epoch_{0}.pth'),0,999,
+        os.path.join(save_dir, f'checkpoint_epoch_0.pth'),0,999,
         use_lora=training_config.use_lora
     )
     # Training loop
     for epoch in range(training_config.num_epochs):
-        if epoch % training_config.visualization_frequency == 0:
-            visualizer.visualize_epoch(model, val_loader, epoch, trainer.prepare_batch,box_th=0.3, txt_th= 0.2)
-        
         epoch_losses = defaultdict(list)
         for batch_idx, batch in enumerate(train_loader):
             losses = trainer.train_step(batch)
@@ -456,6 +459,9 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
               f' LR: {trainer.optimizer.param_groups[0]['lr']:.6f}')
 
         
+        if epoch % training_config.visualization_frequency == 0:
+            visualizer.visualize_epoch(model, val_loader, epoch+1, trainer.prepare_batch,box_th=0.3, txt_th= 0.2)
+        
         # Save checkpoint
         if (epoch + 1) % training_config.save_frequency == 0:
             trainer.save_checkpoint(
@@ -465,8 +471,9 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
                 use_lora=training_config.use_lora
             )
 
-            
+
+
 if __name__ == "__main__":
-    # train('configs/train_config.yaml')
-    train('configs/custum_train_config.yaml')
+    train('configs/train_config.yaml')
+    # train('configs/custum_train_config.yaml')
     # train('configs/tiny_config.yaml')

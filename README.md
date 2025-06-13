@@ -118,3 +118,24 @@ TO DO:
 2. ~~Add LORA for finetuning y~~✅
 3. We did not added auxilary losses as mentioned in the original paper, as we feel we are just finetuning an already trained model but feel free to add auxillary losses and compare results
 4. Add methods to avoid catastropihic forgetting of original model while fine tuning
+
+# My modifications
+
+## Env
+```
+source ../dino/bin/activate
+```
+
+## Running
+One script for inference  
+`python inference.py -c config.yaml`  
+One script for finetuning  
+`python finetune.py -c config.yaml`  
+One script for test/evaluate  
+`python evaluate.py -c config.yaml`  
+
+## TestsTestsTests
+Run tests:
+```
+python tests.py
+```

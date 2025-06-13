@@ -207,16 +207,17 @@ def validate(model, captions, data_config):
 
 def main():
     # models_path = './weights/20250610_1606'
-    models_path = './weights/20250610_1745'
+    # models_path = './weights/20250610_1745' 
+    models_path = './weights/20250611_1559' 
 
     import os
     model_names = [name for name in os.listdir(models_path) if '.pth' in name]
 
-    # config_path="configs/test_config.yaml"
-    # text_prompt="shirt .bag .pants"
+    config_path="configs/test_config.yaml"
+    text_prompt="shirt .bag .pants"
     
-    config_path="configs/custum_test_config.yaml"
-    text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
+    # config_path="configs/custum_test_config.yaml"
+    # text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
     
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
     statistic = []
