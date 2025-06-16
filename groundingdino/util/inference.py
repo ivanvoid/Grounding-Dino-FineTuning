@@ -33,70 +33,101 @@ def preprocess_caption(caption: str) -> str:
     return result + "."
 
 
-def load_weights(model:torch.nn.Module,checkpoint:dict,strict:bool=False):
+def load_weights(model:torch.nn.Module, checkpoint:dict, strict:bool=False):
+    """
+    strict=False
+    The method allows for some flexibility. It will load the parameters that match the keys in the model and ignore any keys in the state_dict that do not match. Additionally, if there are parameters in the model that do not have corresponding keys in the state_dict, they will remain unchanged (i.e., initialized with their default values). This can be useful when you want to load a model with a modified architecture or when you are fine-tuning a model.
+    """
     if "model" in checkpoint.keys():
-        model.load_state_dict(clean_state_dict(checkpoint["model"]), strict=strict)
+        state_dict = clean_state_dict(checkpoint["model"])
+        model.load_state_dict(state_dict, strict=strict)
     else:
-        model.load_state_dict(clean_state_dict(checkpoint), strict=strict)
+        state_dict = clean_state_dict(checkpoint)
+        model.load_state_dict(state_dict, strict=strict)
+
+def load_lora_weights(model, lora_weigths, merge_lora):
+    # Get checkpoint
+    lora_ckpt = torch.load(lora_weigths, map_location="cpu")
+
+    # Rename LoRA checkpoint keys
+    print("Renaming LoRA checkpoint keys to match model structure")
+    if "model" in lora_ckpt:
+        lora_ckpt_state_dict = clean_state_dict(lora_ckpt["model"])
+    else:
+        lora_ckpt_state_dict = clean_state_dict(lora_ckpt)
+    
+    new_lora_ckpt_state_dict = {}
+    
+    # Get modules_to_save from the model
+    modules_to_save = []
+    if hasattr(model, "peft_config") and "default" in model.peft_config:
+        modules_to_save = model.peft_config["default"].modules_to_save
+    
+    # We have to rename the saved lora weights to the one in the lora model, kind of ugly mabe there is a better way    
+    for key, value in lora_ckpt_state_dict.items():
+        new_key = key.replace(".lora_A.weight", ".lora_A.default.weight").replace(".lora_B.weight", ".lora_B.default.weight")
+        
+        # Handle modules_to_save
+        for module_name in modules_to_save:
+            if module_name in key:
+                new_key = new_key.replace(".weight", ".original_module.weight").replace(".bias", ".original_module.bias")
+        new_lora_ckpt_state_dict[new_key] = value
+
+    print("Checking if all lora checkpoint keys exist in the model.")
+    model_state_dict = model.state_dict()
+    
+    missing_keys = []
+    for key in new_lora_ckpt_state_dict.keys():
+        if key not in model_state_dict:
+            missing_keys.append(key)
+
+    if len(missing_keys) > 0:
+        print(f"ERROR: The following LoRA checkpoint keys are missing in the model state dict:")
+        for missing_key in missing_keys:
+            print(f" - {missing_key}")
+        raise Exception("Lora Checkpoint keys missing from model")
+    else:
+            print("All lora checkpoint keys exist in the model state dict!!")
+    
+    if "model" in lora_ckpt:
+        lora_ckpt["model"] = new_lora_ckpt_state_dict
+    else:
+        lora_ckpt = new_lora_ckpt_state_dict
+    load_weights(model, lora_ckpt, strict =False) 
+    if merge_lora:
+        print("Merging LoRA weights with base model")
+        model = model.merge_and_unload()
+    return model
 
 
-def load_model(model_config, use_lora: bool = False, device: str = "cuda", strict: bool = False, lora_rank:int=32, inference=False):
+def load_model(model_config, lora_weigths:str=None, use_lora: bool = None, device: str = "cuda", lora_rank:int=32, inference=False, merge_lora:bool=True):
     args = SLConfig.fromfile(model_config.config_path)
     args.device = device
     model = build_model(args)
-    # import pdb;pdb.set_trace()
+    
+    if use_lora is None:
+        use_lora = model_config.use_lora
+    
     if use_lora:
+        # import pdb;pdb.set_trace()
         # Load base weights
         base_ckpt = torch.load(model_config.weights_path, map_location="cpu")
         load_weights(model, base_ckpt, strict=False)
+        
         print(f"Adding Lora to Model!")
-        model = add_lora_to_model(model, rank=lora_rank, inference=inference) # transforms the model to `PeftModel` object
-        lora_ckpt = torch.load(model_config.lora_weigths, map_location="cpu")
-        # Rename LoRA checkpoint keys
-        print("Renaming LoRA checkpoint keys to match model structure")
-        lora_ckpt_state_dict = clean_state_dict(lora_ckpt["model"]) if "model" in lora_ckpt else clean_state_dict(lora_ckpt)
-        new_lora_ckpt_state_dict = {}
-        # Get modules_to_save from the model
-        modules_to_save = []
-        if hasattr(model, "peft_config") and "default" in model.peft_config:
-            modules_to_save = model.peft_config["default"].modules_to_save
-        # We have to rename the saved lora weights to the one in the lora model, kind of ugly mabe there is a better way    
-        for key, value in lora_ckpt_state_dict.items():
-            new_key = key.replace(".lora_A.weight", ".lora_A.default.weight").replace(".lora_B.weight", ".lora_B.default.weight")
-            # Handle modules_to_save
+        # transforms the model to `PeftModel` object
+        model = add_lora_to_model(model, rank=lora_rank, inference=inference) 
+        
+        if lora_weigths:
+            model = load_lora_weights(model, lora_weigths, merge_lora)
+        else:
+            model = load_lora_weights(model, model_config.lora_weigths, merge_lora)
             
-            for module_name in modules_to_save:
-                if module_name in key:
-                    new_key = new_key.replace(".weight", ".original_module.weight").replace(".bias", ".original_module.bias")
-            new_lora_ckpt_state_dict[new_key] = value
         
-        print("Checking if all lora checkpoint keys exist in the model.")
-        model_state_dict = model.state_dict()
-        
-        missing_keys = []
-        for key in new_lora_ckpt_state_dict.keys():
-            if key not in model_state_dict:
-                missing_keys.append(key)
 
-        if len(missing_keys) > 0:
-            print(f"ERROR: The following LoRA checkpoint keys are missing in the model state dict:")
-            for missing_key in missing_keys:
-                print(f" - {missing_key}")
-            raise Exception("Lora Checkpoint keys missing from model")
-        else:
-             print("All lora checkpoint keys exist in the model state dict!!")
-        
-        if "model" in lora_ckpt:
-            lora_ckpt["model"] = new_lora_ckpt_state_dict
-        else:
-            lora_ckpt = new_lora_ckpt_state_dict
-        load_weights(model, lora_ckpt, strict =False) 
-        print("Merging LoRA weights with base model")
-        model = model.merge_and_unload()
     else:
         base_ckpt = torch.load(model_config.weights_path, map_location="cpu")
-        load_weights(model, base_ckpt, strict=strict)
-        
+        load_weights(model, base_ckpt, strict=False)
     return model
 
 def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
@@ -440,6 +471,8 @@ class Model:
         model_checkpoint_path: str,
         device: str = "cuda"
     ):
+        raise RuntimeError('Function is depricated!')
+        return 
         self.model = load_model(
             model_config_path=model_config_path,
             model_checkpoint_path=model_checkpoint_path,

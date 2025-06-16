@@ -121,18 +121,23 @@ TO DO:
 
 # My modifications
 
+I wanna run `finetune.py` and it will train LORA and evaluate automaticly.
+
 ## Env
 ```
 source ../dino/bin/activate
 ```
 
 ## Running
-One script for inference  
-`python inference.py -c config.yaml`  
+
 One script for finetuning  
 `python finetune.py -c config.yaml`  
+
 One script for test/evaluate  
 `python evaluate.py -c config.yaml`  
+
+One script for inference  
+`python inference.py -c config.yaml`  
 
 ## TestsTestsTests
 Run tests:

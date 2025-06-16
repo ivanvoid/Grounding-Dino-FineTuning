@@ -14,9 +14,9 @@ from groundingdino.util.misc import nested_tensor_from_tensor_list
 from groundingdino.util.model_utils import freeze_model_layers, print_frozen_status
 from groundingdino.util.matchers import build_matcher
 from groundingdino.util.inference import GroundingDINOVisualizer
-from groundingdino.util.model_utils import freeze_model_layers, print_frozen_status
-from groundingdino.util.lora import get_lora_optimizer_params, verify_only_lora_trainable
 from groundingdino.datasets.dataset import GroundingDINODataset
+# from groundingdino.util.model_utils import freeze_model_layers, print_frozen_status
+from groundingdino.util.lora import get_lora_optimizer_params, verify_only_lora_trainable
 from groundingdino.util.losses import SetCriterion
 from config import ConfigurationManager, DataConfig, ModelConfig
 
@@ -30,12 +30,12 @@ from setproctitle import setproctitle
 setproctitle("G-DINO-Train")
 
 
-def setup_model(model_config: ModelConfig, use_lora: bool=False, lora_rank:int=32, device='cuda:0') -> torch.nn.Module:
+def setup_model(model_config: ModelConfig, device='cuda:0') -> torch.nn.Module:
     return load_model(
         model_config.config_path,
         model_config.weights_path,
-        use_lora=use_lora,
-        lora_rank=lora_rank
+        use_lora=model_config.use_lora,
+        lora_rank=model_config.lora_rank
     ).to(device)
 
 def setup_data_loaders(config: DataConfig) -> tuple[DataLoader, DataLoader]:
@@ -73,23 +73,45 @@ class GroundingDINOTrainer:
     def __init__(
         self,
         model,
-        device="cuda",
-        ema_decay=0.999,
-        ema_update_after_step=150,
-        ema_update_every=20,
-        warmup_epochs=5,
-        class_loss_coef=1.0,
-        bbox_loss_coef=5.0,  
-        giou_loss_coef=1.0,  
-        learning_rate=2e-4,   
-        use_ema=False,      
-        num_epochs=500,
-        num_steps_per_epoch=None,
-        lr_scheduler="onecycle",
-        eos_coef=0.1,
-        max_txt_len=256,
-        use_lora=False
+        ema_decay:float=0.999,
+        ema_update_after_step:int=150,
+        ema_update_every:int=20,
+        warmup_epochs:int=5,
+        class_loss_coef:float=1.0,
+        bbox_loss_coef:float=5.0,  
+        giou_loss_coef:float=1.0,  
+        learning_rate:float=2e-4,   
+        use_ema:bool=False,      
+        num_epochs:int=500,
+        num_steps_per_epoch:int=None,
+        lr_scheduler:str="onecycle",
+        eos_coef:float=0.1,
+        max_txt_len:int=256,
+        use_lora:bool=False,
+        device:str="cuda",
     ):
+        """
+        GroundingDINOTrainer class for training a model with specified configurations.
+
+        Args:
+            model: The model to be trained.
+            ema_decay (float): Exponential moving average decay factor, default is 0.999.
+            ema_update_after_step (int): Step after which EMA updates start, default is 150.
+            ema_update_every (int): Frequency of EMA updates, default is every 20 steps.
+            warmup_epochs (int): Number of epochs for learning rate warmup, default is 5.
+            class_loss_coef (float): Coefficient for class loss, default is 1.0.
+            bbox_loss_coef (float): Coefficient for bounding box loss, default is 5.0.
+            giou_loss_coef (float): Coefficient for generalized IoU loss, default is 1.0.
+            learning_rate (float): Initial learning rate for the optimizer, default is 2e-4.
+            use_ema (bool): Flag to use exponential moving average, default is False.
+            num_epochs (int): Total number of epochs for training, default is 500.
+            num_steps_per_epoch (int, optional): Number of steps per epoch, for OneCycle.
+            lr_scheduler (str): Learning rate scheduler type, default is "onecycle".
+            eos_coef (float): Coefficient for end-of-sequence loss, default is 0.1.
+            max_txt_len (int): Maximum length of text input, default is 256.
+            use_lora (bool): Flag to use LoRA (Low-Rank Adaptation), default is False.
+            device (str): The device to run the training on, default is "cuda".
+        """
         self.model = model.to(device)
         self.device = device
         self.class_loss_coef = class_loss_coef
@@ -111,8 +133,8 @@ class GroundingDINOTrainer:
             )
         
         # Initialize scheduler with warmup
+        total_steps = num_steps_per_epoch * num_epochs
         if lr_scheduler=="onecycle":
-            total_steps = num_steps_per_epoch * num_epochs
 	    #warmup_steps = num_steps_per_epoch * warmup_epochs
             #self.scheduler = get_cosine_schedule_with_warmup(
             #    self.optimizer,
@@ -130,8 +152,7 @@ class GroundingDINOTrainer:
                 anneal_strategy='cos'
             )
         else:
-            # Simple step scheduler
-            total_steps = num_steps_per_epoch * num_epochs
+            # Simple step scheduler            
             self.scheduler = torch.optim.lr_scheduler.StepLR(
                 self.optimizer, 
                 step_size=total_steps//20, 
@@ -234,7 +255,7 @@ class GroundingDINOTrainer:
         """Return EMA model for evaluation""" # ???
         return self.ema_model.ema_model
 
-    def save_checkpoint(self, path, epoch, losses, use_lora=False):
+    def save_checkpoint(self, path, epoch, losses, use_lora=False, debug=False):
         """Save checkpoint with EMA and scheduler state""" 
         # import pdb;pdb.set_trace()
         if use_lora:
@@ -257,10 +278,12 @@ class GroundingDINOTrainer:
             }
         torch.save(checkpoint, path)
         
-        ## Debug
-        import numpy as np
-        var = np.sum([x.sum().item() for x in self.model.parameters()])
-        print("Sum of load model: ", var)
+        if debug:
+            ## Debug
+            import numpy as np
+            var = np.sum([x.sum().item() for x in self.model.parameters()])
+            print("Sum of saved model: ", var)
+            return var
 
     @torch.no_grad()
     def evaluate(self, model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None, verbose=False):
@@ -377,22 +400,8 @@ class GroundingDINOTrainer:
 
         return cocoEval.stats
 
-def train(config_path: str, save_dir: Optional[str] = None) -> None:
-    """
-    Main training function with configuration management
-    
-    Args:
-        config_path: Path to the YAML configuration file
-        save_dir: Optional override for save directory
-    """
-
-    data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
-
-    model = setup_model(model_config, training_config.use_lora, training_config.lora_rank)
-    
-    if save_dir:
-        training_config.save_dir = save_dir
-    
+def dump_cfg(all_cfgs):
+    data_config, model_config, training_config = all_cfgs
     # Setup save directory with timestamp
     save_dir = os.path.join(
         training_config.save_dir,
@@ -407,40 +416,59 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
             'model': vars(model_config),
             'training': vars(training_config)
         }, f, default_flow_style=False)
-    
+    return save_dir
+
+def train(config_path: str) -> None:
+    """
+    Main training function with configuration management
+
+    Args:
+        config_path: Path to the YAML configuration file
+    """
+    # Configuration 
+    all_cfgs = ConfigurationManager.load_config(config_path)
+    data_config, model_config, training_config = all_cfgs
+    save_dir = dump_cfg(all_cfgs)
+
+    # Data
     train_loader, val_loader = setup_data_loaders(data_config)
 
-    steps_per_epoch = len(train_loader.dataset) // data_config.batch_size
-    
+    # Validation visualizer
     visualizer = GroundingDINOVisualizer(save_dir=save_dir)
-    
-    if not training_config.use_lora:
+
+    # Model
+    model = setup_model(model_config)
+
+    # Loading LORA
+    if not model_config.use_lora:
         print("Freezing most of model except few layers!")
         freeze_model_layers(model)
-    
     else:
          print( f"Is only Lora trainable?  {verify_only_lora_trainable(model)} ")
-
     print_frozen_status(model)
     
-    # import pdb;pdb.set_trace()
-
+    # Trainer
+    steps_per_epoch = len(train_loader.dataset) // data_config.batch_size
     trainer = GroundingDINOTrainer(
         model,
         num_steps_per_epoch=steps_per_epoch,
         num_epochs=training_config.num_epochs,
         warmup_epochs=training_config.warmup_epochs,
         learning_rate=training_config.learning_rate,
-        use_lora=training_config.use_lora
-    )   
+        use_lora=model_config.use_lora
+    )
+
+    # Save untrained model
     trainer.save_checkpoint(
         os.path.join(save_dir, f'checkpoint_epoch_0.pth'),0,999,
-        use_lora=training_config.use_lora
+        use_lora=model_config.use_lora
     )
+    
     # Training loop
     for epoch in range(training_config.num_epochs):
         epoch_losses = defaultdict(list)
         for batch_idx, batch in enumerate(train_loader):
+
             losses = trainer.train_step(batch)
             
             # Record losses
@@ -453,6 +481,7 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
             #           f"Batch {batch_idx}/{len(train_loader)}, {loss_str}")
             #     print(f"Learning rate: {trainer.optimizer.param_groups[0]['lr']:.6f}")
 
+        # Losses
         avg_losses = {k: sum(v)/len(v) for k, v in epoch_losses.items()}
         print(f"Epoch {epoch+1} complete.\nAverage losses:",
               ", ".join(f"{k}: {v:.4f}" for k, v in avg_losses.items()), 
@@ -471,9 +500,12 @@ def train(config_path: str, save_dir: Optional[str] = None) -> None:
                 use_lora=training_config.use_lora
             )
 
-
-
 if __name__ == "__main__":
-    train('configs/train_config.yaml')
+    
+    config_path = 'configs/train_config.yaml'
+
+    train(config_path)
+
+
     # train('configs/custum_train_config.yaml')
     # train('configs/tiny_config.yaml')

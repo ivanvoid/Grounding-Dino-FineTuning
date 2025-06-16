@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Any
 import yaml
 
-
 @dataclass
 class DataConfig:
     train_dir: str
@@ -27,14 +26,18 @@ class DataConfig:
 class ModelConfig:
     config_path: str
     weights_path: str
-    lora_weigths: str = None
+    lora_weights: str = None
+    use_lora: bool = False
+    lora_rank: int = 32
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ModelConfig':
         return cls(
             config_path=str(data['config_path']),
             weights_path=str(data['weights_path']),
-            lora_weigths=str(data.get('lora_weights', None)),
+            lora_weights=str(data.get('lora_weights', None)),
+            use_lora=bool(data.get('use_lora', False)),
+            lora_rank=int(data.get('lora_rank', 32)),
         )
 
 @dataclass
@@ -42,10 +45,8 @@ class TrainingConfig:
     num_epochs: int = 1000
     learning_rate: float = 1e-3
     save_dir: str = 'weights'
-    save_frequency: int = 100
+    save_frequency: int = 100 
     warmup_epochs: int = 5
-    use_lora: bool = False
-    lora_rank: int = 32
     visualization_frequency: int = 5
 
     @classmethod
@@ -56,8 +57,6 @@ class TrainingConfig:
             save_dir=str(data.get('save_dir', 'weights')),
             save_frequency=int(data.get('save_frequency', 100)),
             warmup_epochs=int(data.get('warmup_epochs', 5)),
-            use_lora=bool(data.get('use_lora', False)),
-            lora_rank=int(data.get('lora_rank', 32)),
             visualization_frequency=int(data.get('visualization_frequency', 5))
         )
 
@@ -67,7 +66,6 @@ class ConfigurationManager:
         """Load configuration from YAML file with type conversion"""
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-            
         try:
             data_config = DataConfig.from_dict(config['data'])
             model_config = ModelConfig.from_dict(config['model'])

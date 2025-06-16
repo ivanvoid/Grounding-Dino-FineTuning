@@ -51,13 +51,13 @@ def verify_only_lora_trainable(model):
     print(f"Trainable LoRA parameters: {trainable_lora:,}")
     return True
 
-def add_lora_to_model(model, rank=32, inference=False):
+def add_lora_to_model(model, rank=32, inference=False, verbose:bool=True):
     """
     Adds LoRA to complete Grounding DINO model using PEFT's functionality"""
 
     config = LoraConfig(
         r=rank,
-        lora_alpha=0*rank, # x2 for big datasets
+        lora_alpha=rank, # x2 for big datasets
         target_modules=[ # Old original settings
             # Decoder cross attention
             "cross_attn.sampling_offsets",
@@ -90,12 +90,15 @@ def add_lora_to_model(model, rank=32, inference=False):
     #     print(name)
     # import pdb;pdb.set_trace()
 
-    print("Converting model to LoRA...")
+    # Converting model to LoRA
     model = get_peft_model(model, config)
 
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in model.parameters())
-    print(f"LoRA parameters: {trainable_params:,} / {total_params:,} = {100 * trainable_params / total_params:.2f}%")
+
+    if verbose:
+        # print("Converting model to LoRA...")
+        print(f"LoRA parameters: {trainable_params:,} / {total_params:,} = {100 * trainable_params / total_params:.2f}%")
 
     return model
 

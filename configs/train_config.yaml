@@ -9,13 +9,13 @@ data:
 model:
   config_path: "groundingdino/config/GroundingDINO_SwinT_OGC.py"
   weights_path: "weights/groundingdino_swint_ogc.pth"
+  use_lora: true
+  lora_rank: 32
 
 training:
   num_epochs: 5
   learning_rate: 1e-3
   save_dir: "weights"
   save_frequency: 1
-  warmup_epochs: 0
-  use_lora: true
-  lora_rank: 32
+  warmup_epochs: 1
   visualization_frequency: 1
