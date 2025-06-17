@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from config import ConfigurationManager, DataConfig, ModelConfig
 from groundingdino.util.inference import load_model, load_image, predict, annotate
-from train import setup_data_loaders, GroundingDINOTrainer
+from finetune import setup_data_loaders, GroundingDINOTrainer
 from groundingdino.util.inference import GroundingDINOVisualizer
 
 import pycocotools
@@ -150,7 +150,7 @@ class PostProcess(nn.Module):
         return results
 
 
-def validate(model, captions, data_config):
+def validate2(model, captions, data_config):
     model.eval()
 
     _, val_loader = setup_data_loaders(data_config)
@@ -169,8 +169,23 @@ def validate(model, captions, data_config):
     # this output is identical
     visualizer = GroundingDINOVisualizer(save_dir='./outputs')
     visualizer.visualize_epoch(
-        model, val_loader, -1, trainer.prepare_batch, box_th=0.3, txt_th= 0.2)
+        model, val_loader, 0, trainer.prepare_batch, box_th=0.3, txt_th= 0.2)
     exit()
+
+def validate(model, captions, data_config):
+    model.eval()
+
+    _, val_loader = setup_data_loaders(data_config)
+
+
+    trainer = GroundingDINOTrainer(
+        model,
+        num_steps_per_epoch=1,
+        num_epochs=1,
+        warmup_epochs=1,
+        learning_rate=0.1,
+        use_lora=True
+    )
     
     """
     criterion = SetCriterion(matcher=matcher, weight_dict=weight_dict,
@@ -211,11 +226,9 @@ def validate(model, captions, data_config):
         logger=None,
         verbose=True)
 
-
-
 def main():
     config_path="configs/test_config.yaml"
-    text_prompt="shirt .bag .pants"
+    text_prompt="shirt.bag.pants"
     
     # config_path="configs/custum_test_config.yaml"
     # text_prompt="crimpers . cutter . drill . hammer . hand file . measurement tape . pen . pendant control . pliers . power supply . scissors . screwdriver . screws . tape . tweezers . usb cable . vernier caliper . whiteboard marker . wire . wrench"
@@ -224,12 +237,10 @@ def main():
     data_config, model_config, training_config = ConfigurationManager.load_config(config_path)
     model = load_model(
         model_config, 
-        training_config.use_lora, 
-        lora_rank=training_config.lora_rank,
-        # inference=True
+        merge_lora=False,
     )
 
-    validate(model, text_prompt, data_config)
+    validate2(model, text_prompt, data_config)
 
 def main_test():
     coco_gt_path = './multimodal-data/test_gt copy.json' # True

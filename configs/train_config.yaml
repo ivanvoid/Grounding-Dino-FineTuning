@@ -14,7 +14,7 @@ model:
 
 training:
   num_epochs: 5
-  learning_rate: 1e-3
+  learning_rate: 0.003
   save_dir: "weights"
   save_frequency: 1
   warmup_epochs: 1

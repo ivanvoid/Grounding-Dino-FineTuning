@@ -100,7 +100,7 @@ def load_lora_weights(model, lora_weigths, merge_lora):
     return model
 
 
-def load_model(model_config, lora_weigths:str=None, use_lora: bool = None, device: str = "cuda", lora_rank:int=32, inference=False, merge_lora:bool=True):
+def load_model(model_config, lora_weights:str=None, use_lora: bool = None, device: str = "cuda", lora_rank:int=32, inference=False, merge_lora:bool=True):
     args = SLConfig.fromfile(model_config.config_path)
     args.device = device
     model = build_model(args)
@@ -118,10 +118,10 @@ def load_model(model_config, lora_weigths:str=None, use_lora: bool = None, devic
         # transforms the model to `PeftModel` object
         model = add_lora_to_model(model, rank=lora_rank, inference=inference) 
         
-        if lora_weigths:
-            model = load_lora_weights(model, lora_weigths, merge_lora)
+        if lora_weights:
+            model = load_lora_weights(model, lora_weights, merge_lora)
         else:
-            model = load_lora_weights(model, model_config.lora_weigths, merge_lora)
+            model = load_lora_weights(model, model_config.lora_weights, merge_lora)
             
         
 

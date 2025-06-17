@@ -497,7 +497,7 @@ def train(config_path: str) -> None:
                 os.path.join(save_dir, f'checkpoint_epoch_{epoch+1}.pth'),
                 epoch,
                 avg_losses,
-                use_lora=training_config.use_lora
+                use_lora=model_config.use_lora
             )
 
 if __name__ == "__main__":

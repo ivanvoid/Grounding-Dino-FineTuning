@@ -8,7 +8,7 @@ data:
 
 model:
   config_path: groundingdino/config/GroundingDINO_SwinT_OGC.py
-  lora_weights: weights/20250613_0910/checkpoint_epoch_2.pth
+  lora_weights: weights/20250613_0910/checkpoint_epoch_5.pth
   weights_path: weights/groundingdino_swint_ogc.pth
   use_lora: true
   lora_rank: 32
